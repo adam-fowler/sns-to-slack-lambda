@@ -33,7 +33,7 @@ Lambda.run { eventLoop in
 }
 #endif
 
-class SNSToSlackHandler: LambdaHandler {
+class SNSToSlackHandler: EventLoopLambdaHandler {
     typealias In = SNS.Event
     typealias Out = Void
 
@@ -75,18 +75,8 @@ class SNSToSlackHandler: LambdaHandler {
         return text
     }
     
-    func handle(context: Lambda.Context, payload: SNS.Event, callback: @escaping (Result<Out, Error>) -> Void) {
+    func handle(context: Lambda.Context, payload: SNS.Event) -> EventLoopFuture<Void> {
         let message = formatMessage(from: payload.records[0].sns)
-        let futureResult = postMessage(message, on: context.eventLoop)
-        futureResult.whenComplete { result in
-            switch result {
-            case .success:
-                context.logger.info("Success!")
-            case .failure(let error):
-                context.logger.error("\(error)")
-            }
-            callback(result)
-        }
+        return postMessage(message, on: context.eventLoop)
     }
-    
 }

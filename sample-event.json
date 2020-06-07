@@ -19,10 +19,6 @@
           "Test": {
             "Type": "String",
             "Value": "TestString"
-          },
-          "TestBinary": {
-            "Type": "Binary",
-            "Value": "TestBinary"
           }
         }
       }
