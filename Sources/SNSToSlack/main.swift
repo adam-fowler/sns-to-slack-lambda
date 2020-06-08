@@ -5,22 +5,6 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-enum SNSToSlackError: Error {
-    case noSlackHookURL
-    case httpError(NIOHTTP1.HTTPResponseStatus)
-}
-
-extension SNSToSlackError: CustomStringConvertible {
-    var description: String {
-        switch self {
-        case .noSlackHookURL:
-            return "SLACK_HOOK_URL environment variable has not been set"
-        case .httpError(let error):
-            return "Request to hook returned http status \(error.code)"
-        }
-    }
-}
-
 #if DEBUG
 try Lambda.withLocalServer {
     Lambda.run { eventLoop in
@@ -37,6 +21,20 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
     typealias In = SNS.Event
     typealias Out = Void
 
+    enum Error: Swift.Error {
+        case noSlackHookURL
+        case httpError(NIOHTTP1.HTTPResponseStatus)
+
+        var description: String {
+            switch self {
+            case .noSlackHookURL:
+                return "SLACK_HOOK_URL environment variable has not been set"
+            case .httpError(let error):
+                return "Request to hook returned http status \(error.code)"
+            }
+        }
+    }
+
     var httpClient: HTTPClient
     
     init(eventLoop: EventLoop) {
@@ -48,7 +46,7 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
     }
     
     func postMessage(_ message: String, on eventLoop: EventLoop) -> EventLoopFuture<Void> {
-        guard let slackHookUrl = Lambda.env("SLACK_HOOK_URL") else { return eventLoop.makeFailedFuture(SNSToSlackError.noSlackHookURL) }
+        guard let slackHookUrl = Lambda.env("SLACK_HOOK_URL") else { return eventLoop.makeFailedFuture(Error.noSlackHookURL) }
         do {
             let json = ["text": message]
             let body = try JSONEncoder().encode(json)
@@ -59,7 +57,7 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
                 body: .data(body))
             return httpClient.execute(request: request, deadline: .now() + .seconds(15))
                 .flatMapThrowing { result in
-                    guard (200..<300).contains(result.status.code) else { throw SNSToSlackError.httpError(result.status) }
+                    guard (200..<300).contains(result.status.code) else { throw Error.httpError(result.status) }
             }
         } catch {
             return eventLoop.makeFailedFuture(error)
