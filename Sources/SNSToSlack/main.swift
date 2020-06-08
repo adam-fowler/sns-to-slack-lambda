@@ -21,7 +21,7 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
     typealias In = SNS.Event
     typealias Out = Void
 
-    enum Error: Swift.Error {
+    enum Error: Swift.Error, CustomStringConvertible {
         case noSlackHookURL
         case httpError(NIOHTTP1.HTTPResponseStatus)
 
