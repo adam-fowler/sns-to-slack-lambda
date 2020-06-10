@@ -35,6 +35,8 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
         }
     }
 
+    let allocator = ByteBufferAllocator()
+    let encoder = JSONEncoder()
     var httpClient: HTTPClient
     
     init(eventLoop: EventLoop) {
@@ -45,20 +47,20 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
         try? self.httpClient.syncShutdown()
     }
     
-    func postMessage(_ body: Data, on eventLoop: EventLoop) throws -> EventLoopFuture<Void> {
+    func postMessage(_ body: ByteBuffer, on eventLoop: EventLoop) throws -> EventLoopFuture<Void> {
         guard let slackHookUrl = Lambda.env("SLACK_HOOK_URL") else { return eventLoop.makeFailedFuture(Error.noSlackHookURL) }
         let request = try HTTPClient.Request(
             url: slackHookUrl,
             method: .POST,
             headers: ["Content-Type": "application/json"],
-            body: .data(body))
+            body: .byteBuffer(body))
         return httpClient.execute(request: request, deadline: .now() + .seconds(15))
             .flatMapThrowing { result in
                 guard (200..<300).contains(result.status.code) else { throw Error.httpError(result.status) }
         }
     }
     
-    func formatMessage(from message: SNS.Message) throws -> Data {
+    func formatMessage(from message: SNS.Message) throws -> ByteBuffer {
         var text = "*From:* \(message.topicArn)\n"
         if let subject = message.subject {
             text += "*Subject:* \(subject)\n"
@@ -67,7 +69,7 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
         
         // Slack hook expects json in the format {"text": "your-message"}
         let json = ["text": text]
-        let body = try JSONEncoder().encode(json)
+        let body = try encoder.encode(json, using: allocator)
 
         return body
     }
