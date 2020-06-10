@@ -45,36 +45,46 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
         try? self.httpClient.syncShutdown()
     }
     
-    func postMessage(_ message: String, on eventLoop: EventLoop) -> EventLoopFuture<Void> {
+    func postMessage(_ body: Data, on eventLoop: EventLoop) throws -> EventLoopFuture<Void> {
         guard let slackHookUrl = Lambda.env("SLACK_HOOK_URL") else { return eventLoop.makeFailedFuture(Error.noSlackHookURL) }
-        do {
-            let json = ["text": message]
-            let body = try JSONEncoder().encode(json)
-            let request = try HTTPClient.Request(
-                url: slackHookUrl,
-                method: .POST,
-                headers: ["Content-Type": "application/json"],
-                body: .data(body))
-            return httpClient.execute(request: request, deadline: .now() + .seconds(15))
-                .flatMapThrowing { result in
-                    guard (200..<300).contains(result.status.code) else { throw Error.httpError(result.status) }
-            }
-        } catch {
-            return eventLoop.makeFailedFuture(error)
+        let request = try HTTPClient.Request(
+            url: slackHookUrl,
+            method: .POST,
+            headers: ["Content-Type": "application/json"],
+            body: .data(body))
+        return httpClient.execute(request: request, deadline: .now() + .seconds(15))
+            .flatMapThrowing { result in
+                guard (200..<300).contains(result.status.code) else { throw Error.httpError(result.status) }
         }
     }
     
-    func formatMessage(from message: SNS.Message) -> String {
+    func formatMessage(from message: SNS.Message) throws -> Data {
         var text = "*From:* \(message.topicArn)\n"
         if let subject = message.subject {
             text += "*Subject:* \(subject)\n"
         }
         text += "*Message:* \(message.message)\n"
-        return text
+        
+        // Slack hook expects json in the format {"text": "your-message"}
+        let json = ["text": text]
+        let body = try JSONEncoder().encode(json)
+
+        return body
     }
     
+    /// Handle a single sns message
+    func handleMessage(context: Lambda.Context, message: SNS.Message) -> EventLoopFuture<Void> {
+        do {
+            let body = try formatMessage(from: message)
+            return try postMessage(body, on: context.eventLoop)
+        } catch {
+            return context.eventLoop.makeFailedFuture(error)
+        }
+    }
+    
+    /// Called by Lambda run. Calls handle message for each message in the supplied payload
     func handle(context: Lambda.Context, payload: SNS.Event) -> EventLoopFuture<Void> {
-        let message = formatMessage(from: payload.records[0].sns)
-        return postMessage(message, on: context.eventLoop)
+        let returnFutures: [EventLoopFuture<Void>] = payload.records.map { return handleMessage(context: context, message: $0.sns) }
+        return EventLoopFuture.whenAllSucceed(returnFutures, on: context.eventLoop).map { _ in }
     }
 }
