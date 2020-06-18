@@ -5,19 +5,12 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-#if DEBUG
-try Lambda.withLocalServer {
-    Lambda.run { eventLoop in
-        return SNSToSlackHandler(eventLoop: eventLoop)
-    }
-}
-#else
-Lambda.run { eventLoop in
-    return SNSToSlackHandler(eventLoop: eventLoop)
-}
-#endif
 
-class SNSToSlackHandler: EventLoopLambdaHandler {
+Lambda.run { context in
+    return SNSToSlackHandler(eventLoop: context.eventLoop )
+}
+
+struct SNSToSlackHandler: EventLoopLambdaHandler {
     typealias In = SNS.Event
     typealias Out = Void
 
@@ -43,8 +36,9 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
         self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(eventLoop))
     }
     
-    deinit {
+    func shutdown(context: Lambda.ShutdownContext) -> EventLoopFuture<Void> {
         try? self.httpClient.syncShutdown()
+        return context.eventLoop.makeSucceededFuture(())
     }
     
     func postMessage(_ body: ByteBuffer, on eventLoop: EventLoop) throws -> EventLoopFuture<Void> {
@@ -85,8 +79,8 @@ class SNSToSlackHandler: EventLoopLambdaHandler {
     }
     
     /// Called by Lambda run. Calls handle message for each message in the supplied payload
-    func handle(context: Lambda.Context, payload: SNS.Event) -> EventLoopFuture<Void> {
-        let returnFutures: [EventLoopFuture<Void>] = payload.records.map { return handleMessage(context: context, message: $0.sns) }
+    func handle(context: Lambda.Context, event: SNS.Event) -> EventLoopFuture<Void> {
+        let returnFutures: [EventLoopFuture<Void>] = event.records.map { return handleMessage(context: context, message: $0.sns) }
         return EventLoopFuture.whenAllSucceed(returnFutures, on: context.eventLoop).map { _ in }
     }
 }
