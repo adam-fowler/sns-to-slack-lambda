@@ -11,8 +11,8 @@ let package = Package(
         .executable(name: "SNSToSlack", targets: ["SNSToSlack"])
     ],
     dependencies: [
-        .package(url: "https://github.com/swift-server/swift-aws-lambda-runtime", from: "0.2.0"),
-        .package(url: "https://github.com/swift-server/async-http-client", from: "1.0.0")
+        .package(url: "https://github.com/swift-server/swift-aws-lambda-runtime", from: "0.3.0"),
+        .package(url: "https://github.com/swift-server/async-http-client", from: "1.2.0")
     ],
     targets: [
         .target(name: "SNSToSlack", dependencies: [

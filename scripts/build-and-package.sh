@@ -17,14 +17,15 @@ set -eu
 
 base=$(pwd)
 executable=SNSToSlack
+swift_docker=swift:5.3-amazonlinux2
 
 echo "-------------------------------------------------------------------------"
 echo "building \"$executable\" lambda"
 echo "-------------------------------------------------------------------------"
-docker run --rm -v "$base":/src -w /src/ swift-lambda-builder bash -cl "swift build --product $executable -c release -Xswiftc -g"
+docker run --rm -v "$base":/src -w /src/ $swift_docker bash -cl "swift build --product $executable -c release -Xswiftc -static-stdlib"
 echo "done"
 
 echo "-------------------------------------------------------------------------"
 echo "packaging \"$executable\" lambda"
 echo "-------------------------------------------------------------------------"
-docker run --rm -v "$base":/src -w /src/ swift-lambda-builder bash -cl "./scripts/package.sh $executable"
+./scripts/package.sh $executable
