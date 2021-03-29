@@ -20,10 +20,9 @@ If you just want the Lambda function installed and don't care about the details,
 ./script/install.sh
 ```
 The install process can be broken into four stages.
-1) Build a Docker image for building the Lambda. `scripts/build-lambda-builder.sh`
-2) Compile the code. First part of `scripts/build-and-package.sh`
-3) Package the compiled Lambda into a zip with required runtime libraries. Second part of `scripts/build-and-package.sh`
-4) Deploy the packaged Lambda. `deploy.sh`
+1) Compile the code. First part of `scripts/build-and-package.sh`
+2) Package the compiled Lambda into a zip with required runtime libraries. Second part of `scripts/build-and-package.sh`
+3) Deploy the packaged Lambda. `deploy.sh`
 
 If this is the first time you are running the install, the `deploy.sh` script will create a new IAM role to run the Lambda and create a new Lambda function. Otherwise it will just update the already created Lambda.
 
