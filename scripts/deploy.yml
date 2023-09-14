@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion : '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Deploy sns-to-slack lambda function.
+
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: 128
+
+Resources:
+# Benchmark Function
+  snsToSlackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: Provided
+      Runtime: provided.al2
+      Architectures: 
+        - arm64
+      CodeUri: ../.build/plugins/AWSLambdaPackager/outputs/AWSLambdaPackager/SNSToSlack/SNSToSlack.zip
+      Environment:
+        Variables:
+          SLACK_HOOK_URL: https://hooks.slack.com/services/<my-slack-webhook>
+      # Instructs new versions to be published to an alias named "live".
+      AutoPublishAlias: live

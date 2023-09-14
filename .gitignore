@@ -1,7 +1,9 @@
 .DS_Store
 /.build
+/.vscode
 /.swiftpm
 /Packages
 /*.xcodeproj
 xcuserdata/
 Package.resolved
+samconfig.toml

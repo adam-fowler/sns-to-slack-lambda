@@ -8,28 +8,19 @@ Click [here](https://api.slack.com/apps) to go to the Slack Apps setup page. Cli
 
 ## Build and install
 
-Before continuing you will need [Docker Desktop for Mac](https://docs.docker.com/docker-for-mac/install/) installed. You will also need the AWS command line interface installed. You can install `awscli` with Homebrew.
+Before continuing you will need [Docker Desktop for Mac](https://docs.docker.com/docker-for-mac/install/) installed. You will also need the AWS command line interface and AWS SAM installed. You can install `awscli` and `sam` with Homebrew.
 ```
+brew tap aws/tap
 brew install awscli
+brew install aws-sam-cli
 ```
+There are two stages to getting the Lambda installed.
 
-There are four stages to getting the Lambda installed. I have collated all of these into a series of shell scripts, which are a mixture of my own work and bastardised versions of the scripts to be found in the [swift-aws-lambda-runtime](https://github.com/swift-server/swift-aws-lambda-runtime/tree/master/Examples/LambdaFunctions/scripts) repository.
-
-If you just want the Lambda function installed and don't care about the details, just run the install script which runs all the stages.
-```
-./script/install.sh
-```
-The install process can be broken into four stages.
-1) Compile the code. First part of `scripts/build-and-package.sh`
-2) Package the compiled Lambda into a zip with required runtime libraries. Second part of `scripts/build-and-package.sh`
-3) Deploy the packaged Lambda. `deploy.sh`
-
-If this is the first time you are running the install, the `deploy.sh` script will create a new IAM role to run the Lambda and create a new Lambda function. Otherwise it will just update the already created Lambda.
+The install process can be broken into two stages, each with its own shell script.
+1) build-and-package.sh: Building and packaging the lambda. This uses the `archive` command plugin that comes with the swift-aws-lambda-runtime
+2) deploy.sh: Deploying the packaged Lambda to AWS using AWS SAM. The first time you run this you should add the command line parameter `--guided`. This will ask a number of questions about how you want the deployment to work.
 
 ## Link to Slack
 
-The Lambda uses the Environment variable SLACK_HOOK_URL to get the URL to post to. You can set this using the aws cli or on the AWS dashboard. You can do it using the awscli as follows
-```
-aws lambda update-function-configuration --function-name swift-sns-to-slack --environment "Variables={SLACK_HOOK_URL=https://hooks.slack.com/services/<my-slack-webhook>}"
-```
+The Lambda uses the Environment variable SLACK_HOOK_URL to get the URL to post to. You need to edit the SAM `deploy.yml`` to point this environment variable to the correct URL.
 
