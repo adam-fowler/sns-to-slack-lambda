@@ -2,17 +2,15 @@ import AsyncHTTPClient
 import AWSLambdaEvents
 import AWSLambdaRuntime
 import Foundation
-import NIO
+import NIOCore
+import NIOFoundationCompat
 import NIOHTTP1
 
 
-Lambda.run { context in
-    return SNSToSlackHandler(eventLoop: context.eventLoop )
-}
-
+@main
 struct SNSToSlackHandler: EventLoopLambdaHandler {
-    typealias In = SNS.Event
-    typealias Out = Void
+    typealias Event = SNSEvent
+    typealias Output = Void
 
     enum Error: Swift.Error, CustomStringConvertible {
         case noSlackHookURL
@@ -32,13 +30,18 @@ struct SNSToSlackHandler: EventLoopLambdaHandler {
     let encoder = JSONEncoder()
     var httpClient: HTTPClient
     
-    init(eventLoop: EventLoop) {
-        self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(eventLoop))
+    init(context: LambdaInitializationContext) {
+        self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(context.eventLoop))
     }
     
-    func shutdown(context: Lambda.ShutdownContext) -> EventLoopFuture<Void> {
-        try? self.httpClient.syncShutdown()
-        return context.eventLoop.makeSucceededFuture(())
+    static func makeHandler(context: LambdaInitializationContext) -> EventLoopFuture<Self> {
+        return context.eventLoop.makeSucceededFuture(Self(context: context))
+    }
+
+    /// Called by Lambda run. Calls handle message for each message in the supplied payload
+    func handle(_ event: Event, context: LambdaContext) -> EventLoopFuture<Void> {
+        let returnFutures: [EventLoopFuture<Void>] = event.records.map { return handleMessage(context: context, message: $0.sns) }
+        return EventLoopFuture.whenAllSucceed(returnFutures, on: context.eventLoop).map { _ in }
     }
     
     func postMessage(_ body: ByteBuffer, on eventLoop: EventLoop) throws -> EventLoopFuture<Void> {
@@ -54,7 +57,7 @@ struct SNSToSlackHandler: EventLoopLambdaHandler {
         }
     }
     
-    func formatMessage(from message: SNS.Message) throws -> ByteBuffer {
+    func formatMessage(from message: SNSEvent.Message) throws -> ByteBuffer {
         var text = "*From:* \(message.topicArn)\n"
         if let subject = message.subject {
             text += "*Subject:* \(subject)\n"
@@ -63,24 +66,18 @@ struct SNSToSlackHandler: EventLoopLambdaHandler {
         
         // Slack hook expects json in the format {"text": "your-message"}
         let json = ["text": text]
-        let body = try encoder.encode(json, using: allocator)
+        let body = try encoder.encodeAsByteBuffer(json, allocator: allocator)
 
         return body
     }
     
     /// Handle a single sns message
-    func handleMessage(context: Lambda.Context, message: SNS.Message) -> EventLoopFuture<Void> {
+    func handleMessage(context: LambdaContext, message: SNSEvent.Message) -> EventLoopFuture<Void> {
         do {
             let body = try formatMessage(from: message)
             return try postMessage(body, on: context.eventLoop)
         } catch {
             return context.eventLoop.makeFailedFuture(error)
         }
-    }
-    
-    /// Called by Lambda run. Calls handle message for each message in the supplied payload
-    func handle(context: Lambda.Context, event: SNS.Event) -> EventLoopFuture<Void> {
-        let returnFutures: [EventLoopFuture<Void>] = event.records.map { return handleMessage(context: context, message: $0.sns) }
-        return EventLoopFuture.whenAllSucceed(returnFutures, on: context.eventLoop).map { _ in }
     }
 }
